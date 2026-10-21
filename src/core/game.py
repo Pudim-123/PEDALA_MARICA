@@ -16,6 +16,8 @@ class Game:
         self.tela = pygame.display.set_mode((LARGURA, ALTURA))
         self.relogio = pygame.time.Clock()
         self.recursos = Recursos()
+        self.save_path = None
+        self.player_name = ""
         self.cena = CenaTitulo(self)    # o mundo é criado ao apertar JOGAR
         self.rodando = True
 
