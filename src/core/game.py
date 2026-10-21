@@ -18,6 +18,7 @@ class Game:
         self.recursos = Recursos()
         self.save_path = None
         self.player_name = ""
+        self.musica_ambiente = None
         self.cena = CenaTitulo(self)    # o mundo é criado ao apertar JOGAR
         self.rodando = True
 
@@ -29,7 +30,10 @@ class Game:
                     self.rodando = False
                 elif ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
                     if isinstance(self.cena, CenaMundo):
-                        # Retorna ao menu sem apagar o progresso salvo.
+                        # Para a música e retorna ao menu sem apagar o progresso salvo.
+                        if self.musica_ambiente:
+                            self.musica_ambiente.stop()
+                            self.musica_ambiente = None
                         self.cena = CenaTitulo(self)
                     elif not WEB:
                         self.rodando = False
