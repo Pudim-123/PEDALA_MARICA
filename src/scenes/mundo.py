@@ -17,7 +17,7 @@ from src.systems.pontuacao import MAXIMO_TOTAL, MINIMO_ACERTOS, PERGUNTAS_POR_FA
 from src.systems.progresso import Progresso
 from src.ui.conversa import CONFIRMAR, Conversa
 from src.ui.desafio import DesafioUI
-from src.ui.texto import carregar_fonte, quebrar
+from src.ui.texto import quebrar
 from src.world.mapa import Mapa
 from src.world.objetos import CATALOGO
 from src.world.render_chao import montar_superficie_chao
@@ -45,7 +45,6 @@ class CenaMundo(Cena):
         self.mapa = Mapa.carregar(caminho_mapa)
         dados = self.mapa.dados
         self.hist = json.loads((DATA / "historia.json").read_text(encoding="utf-8"))
-        self.dialogos = json.loads((DATA / "dialogos.json").read_text(encoding="utf-8")) if (DATA / "dialogos.json").exists() else {}
         self.perguntas = carregar_perguntas(DATA / "perguntas.json")
         verificar_npcs(dados.get("npcs", []), self.perguntas)
         self.progresso = Progresso(None if WEB else (getattr(jogo, "save_path", None) or DATA / "save.json"),
@@ -55,25 +54,15 @@ class CenaMundo(Cena):
         for f in FASES:
             if f"boss_{f}" in self.progresso.bosses:
                 self.mapa.liberar(f)
-        npc_diag = self.dialogos.get("npcs", {})
         self.npcs = [NPC(n["id"], n["nome"], n["col"], n["linha"], rec.personagem(n["folha"], n.get("tom", 0)),
                          Direcao[n.get("dir", "baixo").upper()], n.get("fase", 0), n.get("pergunta"),
-                         npc_diag.get(n["id"], {}).get("fala", n.get("fala", "")),
-                         n.get("papel", "guia"),
-                         npc_diag.get(n["id"], {}).get("falas", n.get("falas", [])),
-                         n.get("extras", []))
+                         n.get("fala", ""), n.get("papel", "guia"), n.get("falas", []), n.get("extras", []))
                      for n in dados.get("npcs", [])]
         self.npc_em = {(n.col, n.linha): n for n in self.npcs}
         self.npc_id = {n.id: n for n in self.npcs}
         self.chefoes = json.loads((DATA / "chefoes.json").read_text(encoding="utf-8"))
         self.desafio, self.caca = None, None
-        poi_diag = self.dialogos.get("pois", {})
-        self.pois = {}
-        for p in dados.get("pois", []):
-            item = dict(p)
-            if p["id"] in poi_diag:
-                item.update(poi_diag[p["id"]])
-            self.pois[(p["col"], p["linha"])] = item
+        self.pois = {(p["col"], p["linha"]): p for p in dados.get("pois", [])}
         self.total_curiosidades = len({p["id"] for p in self.pois.values() if p.get("curiosidade")})
         self.zonas = dados.get("zonas", [])
         self.conchas_mapa = {(c["col"], c["linha"]): c["id"] for c in dados.get("conchas", [])}
@@ -86,7 +75,7 @@ class CenaMundo(Cena):
         self.sombra = rec.sombra()
         self.camera = Camera(LARGURA, ALTURA, self.mapa.largura_px, self.mapa.altura_px)
         self.entrada = EntradaDirecional()
-        self.fonte, self.fonte_p = carregar_fonte(28), carregar_fonte(22)
+        self.fonte, self.fonte_p = pygame.font.Font(None, 30), pygame.font.Font(None, 24)
         self.conversa = Conversa(self.fonte, self.fonte_p)
         self.hud_fundo = pygame.Surface((372, 120), pygame.SRCALPHA)
         self.hud_fundo.fill((24, 41, 56, 205))
@@ -169,13 +158,7 @@ class CenaMundo(Cena):
             if res:
                 self.conversa.inserir(self._itens_fim_fase(npc.fase, res))
 
-        falas_iniciais = []
-        if npc.fala:
-            falas_iniciais.append(npc.fala)
-        if getattr(q, "ensino", ""):
-            falas_iniciais.append(q.ensino)
-
-        itens = self._falas(npc.nome, falas_iniciais or [npc.fala]) + [{
+        itens = self._falas(npc.nome, [npc.fala]) + [{
             "tipo": "escolha", "nome": npc.nome, "texto": q.texto, "opcoes": list(q.alternativas),
             "correta": q.correta, "explicacao": q.explicacao, "fonte": q.fonte_titulo,
             "ao_escolher": ao_escolher, "ajuda": ajuda,
@@ -195,7 +178,7 @@ class CenaMundo(Cena):
     def _caderno(self):
         p = self.progresso
         rec = " · ".join(f"F{f} {p.placar.melhor(f)}" for f in FASES)
-        resumo = (f"Selos: {sum(f'boss_{f}' in p.bosses for f in FASES)}/{TOTAL_FASES}. Recordes: {rec}. "
+        resumo = (f"Selos: {sum(f"boss_{f}" in p.bosses for f in FASES)}/{TOTAL_FASES}. Recordes: {rec}. "
                   f"Conchas: {p.conchas}. Curiosidades: {len(p.curiosidades)}/{self.total_curiosidades}.")
         itens = self._falas("Caderno", [resumo])
         vistos = {poi["id"]: poi for poi in self.pois.values() if poi["id"] in p.curiosidades}
