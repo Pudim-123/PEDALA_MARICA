@@ -32,7 +32,7 @@ def iniciar_ambiente():
         onda_direita = onda_direita * 0.985 + ruido_direito * 0.015
         mare = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(2 * math.pi * 0.12 * t - 1.2))
         espuma = 0.65 + 0.35 * math.sin(2 * math.pi * 0.31 * t)
-        amostras.append(int(max(-1.0, min(1.0, onda * mare * espuma * 12500))))
+        amostras.append(int(max(-1.0, min(1.0, onda * mare * espuma * 12500)))))
         if canais == 2:
             amostras.append(int(max(-1.0, min(1.0, onda_direita * mare * espuma * 12500)))
 
