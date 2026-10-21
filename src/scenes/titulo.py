@@ -12,7 +12,7 @@ CONFIRMAR = (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE, pygame.K_e)
 CIMA, BAIXO = (pygame.K_UP, pygame.K_w), (pygame.K_DOWN, pygame.K_s)
 TINTA, OURO, BRANCO, VERMELHO = (29, 39, 66), (255, 216, 94), (255, 255, 255), (229, 72, 77)
 PAPEL = (255, 250, 240)
-SAVE = DATA / "save.json"
+SAVE_SLOTS = [DATA / "save.json", DATA / "save_2.json", DATA / "save_3.json"]
 COMANDOS = [
     ("SETAS ou WASD", "andar pelo mapa"),
     ("E, ESPAÇO ou ENTER", "falar com guias e ler placas"),
@@ -31,7 +31,9 @@ class CenaTitulo(Cena):
         super().__init__(jogo)
         rec = jogo.recursos
         self.tempo, self.saindo = 0.0, None
-        self.tem_save = not WEB and SAVE.exists()
+        self.tem_save = not WEB and any(p.exists() for p in SAVE_SLOTS)
+        self.slot_selecionado = 0
+        self.nome_digitado = ""
         self.modo = "menu"            # "menu", "confirma" (apagar progresso) ou "como" (tela de comandos)
         self.itens, self.sel = [], 0
         self._trocar_modo("menu")
@@ -60,28 +62,47 @@ class CenaTitulo(Cena):
     def _trocar_modo(self, modo):
         self.modo = modo
         if modo == "menu":
-            self.itens = (["CONTINUAR", "NOVO JOGO"] if self.tem_save else ["JOGAR"]) + ["COMO JOGAR"] + ([] if WEB else ["SAIR"])
+            self.itens = (["CONTINUAR", "NOVO JOGO"] if self.tem_save else ["NOVO JOGO"]) + ["COMO JOGAR"] + ([] if WEB else ["SAIR"])
             self.sel = 0
+        elif modo in ("slots_carregar", "slots_novo"):
+            self.itens = [f"SLOT {i + 1}" + (" — ocupado" if p.exists() else " — vazio")
+                          for i, p in enumerate(SAVE_SLOTS)] + ["VOLTAR"]
+            self.sel = 0
+        elif modo == "nome":
+            self.itens, self.sel = [], 0
         elif modo == "confirma":
-            self.itens, self.sel = ["APAGAR E COMEÇAR", "VOLTAR"], 1      # começa em VOLTAR (mais seguro)
+            self.itens, self.sel = ["SOBRESCREVER SLOT", "VOLTAR"], 1
         else:
             self.itens, self.sel = [], 0
         self.botoes = [pygame.Rect(LARGURA // 2 - 180, 290 + i * 66, 360, 54) for i in range(len(self.itens))]
 
     def _escolher(self):
         acao = self.itens[self.sel]
-        if acao in ("JOGAR", "CONTINUAR"):
-            self.saindo = 0.0                 # escurece a tela e depois entra no mundo
-        elif acao == "NOVO JOGO":
-            self._trocar_modo("confirma")
-        elif acao == "APAGAR E COMEÇAR":
-            SAVE.unlink(missing_ok=True)
-            self.tem_save = False
-            self.saindo = 0.0
-        elif acao == "COMO JOGAR":
-            self._trocar_modo("como")
+        if acao == "CONTINUAR":
+            self._trocar_modo("slots_carregar")
+        elif acao in ("NOVO JOGO", "JOGAR"):
+            self._trocar_modo("slots_novo")
+        elif self.modo in ("slots_carregar", "slots_novo") and acao.startswith("SLOT "):
+            self.slot_selecionado = int(acao[5]) - 1
+            caminho = SAVE_SLOTS[self.slot_selecionado]
+            if self.modo == "slots_carregar":
+                if caminho.exists():
+                    self.jogo.save_path = caminho
+                    self.jogo.player_name = ""
+                    self.saindo = 0.0
+            elif caminho.exists():
+                self._trocar_modo("confirma")
+            else:
+                self.nome_digitado = ""
+                self._trocar_modo("nome")
+        elif acao == "SOBRESCREVER SLOT":
+            SAVE_SLOTS[self.slot_selecionado].unlink(missing_ok=True)
+            self.nome_digitado = ""
+            self._trocar_modo("nome")
         elif acao == "VOLTAR":
             self._trocar_modo("menu")
+        elif acao == "COMO JOGAR":
+            self._trocar_modo("como")
         elif acao == "SAIR":
             self.jogo.rodando = False
 
@@ -89,19 +110,32 @@ class CenaTitulo(Cena):
     def processar_evento(self, ev):
         if self.saindo is not None:
             return
+        if self.modo == "nome":
+            if ev.type == pygame.KEYDOWN:
+                if ev.key == pygame.K_RETURN:
+                    self.jogo.save_path = SAVE_SLOTS[self.slot_selecionado]
+                    self.jogo.player_name = self.nome_digitado.strip()[:18] or "Ciclista"
+                    self.saindo = 0.0
+                elif ev.key == pygame.K_BACKSPACE:
+                    self.nome_digitado = self.nome_digitado[:-1]
+                elif ev.unicode and ev.unicode.isprintable() and len(self.nome_digitado) < 18:
+                    proibidos = chr(92) + '/:*?' + chr(34) + '<>|'
+                    if not any(ch in proibidos for ch in ev.unicode):
+                        self.nome_digitado += ev.unicode
+            return
         if self.modo == "como":
             if (ev.type == pygame.KEYDOWN and ev.key in CONFIRMAR + (pygame.K_BACKSPACE,)) or (
                     ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1):
                 self._trocar_modo("menu")
             return
         if ev.type == pygame.KEYDOWN:
-            if ev.key in CIMA:
+            if ev.key in CIMA and self.itens:
                 self.sel = (self.sel - 1) % len(self.itens)
-            elif ev.key in BAIXO:
+            elif ev.key in BAIXO and self.itens:
                 self.sel = (self.sel + 1) % len(self.itens)
-            elif ev.key in CONFIRMAR:
+            elif ev.key in CONFIRMAR and self.itens:
                 self._escolher()
-            elif ev.key == pygame.K_BACKSPACE and self.modo == "confirma":
+            elif ev.key == pygame.K_BACKSPACE and self.modo in ("confirma", "slots_carregar", "slots_novo"):
                 self._trocar_modo("menu")
         elif ev.type == pygame.MOUSEMOTION:
             for i, r in enumerate(self.botoes):
@@ -162,7 +196,13 @@ class CenaTitulo(Cena):
         self._texto(self.f_titulo, "PEDALA, MARICÁ!", BRANCO, (LARGURA // 2, 96), desloc=5)
         self._texto(self.f_sub, "Um RPG sobre a história, a natureza e a cultura de Maricá (RJ)", OURO, (LARGURA // 2, 168))
         if self.modo == "confirma":
-            self._texto(self.f_sub, "Isso apaga o seu progresso salvo. Tem certeza?", BRANCO, (LARGURA // 2, 250))
+            self._texto(self.f_sub, "Este slot já tem progresso. Sobrescrever?", BRANCO, (LARGURA // 2, 250))
+        if self.modo in ("slots_carregar", "slots_novo"):
+            self._texto(self.f_sub, "Escolha um slot para sua partida.", BRANCO, (LARGURA // 2, 240))
+        if self.modo == "nome":
+            self._texto(self.f_sub, "Digite o nome do personagem e pressione ENTER", BRANCO, (LARGURA // 2, 260))
+            self._texto(self.f_botao, self.nome_digitado + ("_" if int(self.tempo * 2) % 2 == 0 else ""),
+                        OURO, (LARGURA // 2, 330))
         if self.modo == "como":
             self._painel_comandos(tela)
         for i, (rot, r) in enumerate(zip(self.itens, self.botoes)):
@@ -176,7 +216,11 @@ class CenaTitulo(Cena):
                 seta = [(x, y - 12), (x + 18, y), (x, y + 12)]
                 pygame.draw.polygon(tela, OURO, seta)
                 pygame.draw.polygon(tela, TINTA, seta, 3)
-        dica = {"menu": "SETAS escolhem   ·   ENTER confirma", "confirma": "SETAS escolhem   ·   BACKSPACE volta",
+        dica = {"menu": "SETAS escolhem   ·   ENTER confirma",
+                "slots_carregar": "SETAS escolhem   ·   ENTER carrega   ·   BACKSPACE volta",
+                "slots_novo": "SETAS escolhem   ·   ENTER seleciona slot   ·   BACKSPACE volta",
+                "nome": "ENTER confirma o nome   ·   BACKSPACE apaga",
+                "confirma": "ENTER sobrescreve   ·   BACKSPACE volta",
                 "como": "ENTER ou clique para voltar"}[self.modo]
         self._texto(self.f_dica, dica, BRANCO, (LARGURA // 2, ALTURA - 24))
         if self.saindo is not None:
