@@ -47,8 +47,10 @@ class CenaMundo(Cena):
         self.hist = json.loads((DATA / "historia.json").read_text(encoding="utf-8"))
         self.perguntas = carregar_perguntas(DATA / "perguntas.json")
         verificar_npcs(dados.get("npcs", []), self.perguntas)
-        self.progresso = Progresso(None if WEB else DATA / "save.json")
+        self.progresso = Progresso(None if WEB else (getattr(jogo, "save_path", None) or DATA / "save.json"),
+                                     getattr(jogo, "player_name", "") or "Ciclista")
         self.progresso.carregar()
+        self.jogo.player_name = self.progresso.nome_jogador
         for f in FASES:
             if f"boss_{f}" in self.progresso.bosses:
                 self.mapa.liberar(f)
@@ -342,7 +344,7 @@ class CenaMundo(Cena):
                 pygame.draw.circle(tela, OURO, centro, 10)
             pygame.draw.circle(tela, (247, 247, 242), centro, 10, 2)
         self._texto(tela, f"Pontos: {p.placar.total}   Conchas: {p.conchas}", (124, 24))
-        self._texto(tela, self._zona(), (22, 52), self.fonte_p, OURO)
+        self._texto(tela, f"{p.nome_jogador} · {self._zona()}", (22, 52), self.fonte_p, OURO)
         self._texto(tela, f"Caderno {len(p.curiosidades)}/{self.total_curiosidades}", (260, 52), self.fonte_p)
         f = self._fase_atual()
         if "final" in p.bosses:
