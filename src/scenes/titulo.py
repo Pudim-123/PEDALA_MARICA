@@ -20,7 +20,7 @@ COMANDOS = [
     ("C", "abrir o caderno de curiosidades"),
     ("H (na pergunta)", "usar uma concha e eliminar uma resposta errada"),
     ("F3", "mostrar informações de depuração"),
-    ("ESC", "sair do jogo"),
+    ("ESC", "voltar ao menu"),
 ]
 Y_CHAO = ALTURA - 3 * TILE      # a faixa de areia e grama começa aqui
 TEMPO_FADE = 0.35
