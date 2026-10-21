@@ -77,7 +77,7 @@ class CenaMundo(Cena):
         self.entrada = EntradaDirecional()
         self.fonte, self.fonte_p = pygame.font.Font(None, 30), pygame.font.Font(None, 24)
         self.conversa = Conversa(self.fonte, self.fonte_p)
-        self.hud_fundo = pygame.Surface((372, 104), pygame.SRCALPHA)
+        self.hud_fundo = pygame.Surface((372, 120), pygame.SRCALPHA)
         self.hud_fundo.fill((24, 41, 56, 205))
         self.bike, self.debug = False, False
         self._seguir_jogador()
@@ -344,8 +344,8 @@ class CenaMundo(Cena):
                 pygame.draw.circle(tela, OURO, centro, 10)
             pygame.draw.circle(tela, (247, 247, 242), centro, 10, 2)
         self._texto(tela, f"Pontos: {p.placar.total}   Conchas: {p.conchas}", (124, 24))
-        self._texto(tela, f"{p.nome_jogador} · {self._zona()}", (22, 52), self.fonte_p, OURO)
-        self._texto(tela, f"Caderno {len(p.curiosidades)}/{self.total_curiosidades}", (260, 52), self.fonte_p)
+        self._texto(tela, f"Jogador: {p.nome_jogador} · {self._zona()}", (22, 52), self.fonte_p, OURO)
+        self._texto(tela, f"Caderno {len(p.curiosidades)}/{self.total_curiosidades}", (22, 74), self.fonte_p)
         f = self._fase_atual()
         if "final" in p.bosses:
             obj = "Missão cumprida: o Farol está aceso!"
@@ -357,7 +357,7 @@ class CenaMundo(Cena):
             obj = f"Fase {f}: enfrente o chefão!"
         else:
             obj = f"Fase {f}: guias {p.respondidas(f)}/{PERGUNTAS_POR_FASE}"
-        self._texto(tela, obj, (22, 78), self.fonte_p)
+        self._texto(tela, obj, (22, 96), self.fonte_p)
 
     def _hud_caca(self, tela):
         if not self.caca:
