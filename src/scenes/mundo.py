@@ -12,6 +12,7 @@ from src.entities.jogador import Jogador
 from src.entities.npc import NPC
 from src.scenes.base import Cena
 from src.systems.desafios import criar_desafio
+from src.systems.musica import iniciar_ambiente
 from src.systems.perguntas import carregar_perguntas, verificar_npcs
 from src.systems.pontuacao import MAXIMO_TOTAL, MINIMO_ACERTOS, PERGUNTAS_POR_FASE, TOTAL_FASES
 from src.systems.progresso import Progresso
@@ -41,6 +42,7 @@ class _Colisao:
 class CenaMundo(Cena):
     def __init__(self, jogo, caminho_mapa=DATA / "mapas" / "marica.json"):
         super().__init__(jogo)
+        jogo.musica_ambiente = iniciar_ambiente()
         rec = jogo.recursos
         self.mapa = Mapa.carregar(caminho_mapa)
         dados = self.mapa.dados
