@@ -1,4 +1,5 @@
 """Tela de título: JOGAR/CONTINUAR, NOVO JOGO, COMO JOGAR e SAIR. Ao começar, segue para o mundo e os diálogos do Seu Zeca."""
+import json
 import math
 
 import pygame
@@ -47,6 +48,29 @@ class CenaTitulo(Cena):
         self.moradores = [(rec.personagem(f"NPC_{n}.png", tom), x) for n, tom, x in ((1, 0, 250), (5, 1, 330), (12, 2, 600))]
         self.fundo = self._montar_fundo()
 
+
+    def _carregar_ranking(self):
+        # NPCs são referências fixas; as pontuações reais vêm dos saves existentes.
+        ranking = [
+            ("Seu Zeca (NPC)", 1650),
+            ("Guia da Lagoa (NPC)", 1400),
+            ("Ciclista de Itaipuaçu (NPC)", 1200),
+        ]
+        for caminho in SAVE_SLOTS:
+            try:
+                if caminho.exists():
+                    dados = json.loads(caminho.read_text(encoding="utf-8"))
+                    nome = str(dados.get("nome_jogador", "Ciclista"))[:18] or "Ciclista"
+                    melhores = dados.get("melhores", [])
+                    pontos = sum(v for v in melhores if isinstance(v, int) and not isinstance(v, bool))
+                    ranking.append((nome, pontos))
+            except (OSError, ValueError, TypeError):
+                continue
+        melhores_por_nome = {}
+        for nome, pontos in ranking:
+            melhores_por_nome[nome] = max(pontos, melhores_por_nome.get(nome, -1))
+        return sorted(melhores_por_nome.items(), key=lambda item: item[1], reverse=True)[:8]
+
     def _montar_fundo(self):
         s = pygame.Surface((LARGURA, ALTURA))
         for y in range(0, ALTURA, TILE):
@@ -62,12 +86,15 @@ class CenaTitulo(Cena):
     def _trocar_modo(self, modo):
         self.modo = modo
         if modo == "menu":
-            self.itens = (["CONTINUAR", "NOVO JOGO"] if self.tem_save else ["NOVO JOGO"]) + ["COMO JOGAR"] + ([] if WEB else ["SAIR"])
+            self.itens = (["CONTINUAR", "NOVO JOGO"] if self.tem_save else ["NOVO JOGO"]) + ["RANKING", "COMO JOGAR"] + ([] if WEB else ["SAIR"])
             self.sel = 0
         elif modo in ("slots_carregar", "slots_novo"):
             self.itens = [f"SLOT {i + 1}" + (" — ocupado" if p.exists() else " — vazio")
                           for i, p in enumerate(SAVE_SLOTS)] + ["VOLTAR"]
             self.sel = 0
+        elif modo == "ranking":
+            self.itens, self.sel = [], 0
+            self.ranking = self._carregar_ranking()
         elif modo == "nome":
             self.itens, self.sel = [], 0
         elif modo == "confirma":
@@ -101,6 +128,8 @@ class CenaTitulo(Cena):
             self._trocar_modo("nome")
         elif acao == "VOLTAR":
             self._trocar_modo("menu")
+        elif acao == "RANKING":
+            self._trocar_modo("ranking")
         elif acao == "COMO JOGAR":
             self._trocar_modo("como")
         elif acao == "SAIR":
@@ -123,7 +152,7 @@ class CenaTitulo(Cena):
                     if not any(ch in proibidos for ch in ev.unicode):
                         self.nome_digitado += ev.unicode
             return
-        if self.modo == "como":
+        if self.modo in ("como", "ranking"):
             if (ev.type == pygame.KEYDOWN and ev.key in CONFIRMAR + (pygame.K_BACKSPACE,)) or (
                     ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1):
                 self._trocar_modo("menu")
@@ -195,6 +224,21 @@ class CenaTitulo(Cena):
 
         self._texto(self.f_titulo, "PEDALA, MARICÁ!", BRANCO, (LARGURA // 2, 96), desloc=5)
         self._texto(self.f_sub, "Um RPG sobre a história, a natureza e a cultura de Maricá (RJ)", OURO, (LARGURA // 2, 168))
+
+        if self.modo == "ranking":
+            caixa = pygame.Rect(170, 205, LARGURA - 340, 350)
+            pygame.draw.rect(tela, TINTA, caixa.move(5, 5))
+            pygame.draw.rect(tela, PAPEL, caixa)
+            pygame.draw.rect(tela, TINTA, caixa, 4)
+            self._texto(self.f_botao, "RANKING DOS CICLISTAS", VERMELHO, (caixa.centerx, caixa.top + 30), sombra=None)
+            for i, (nome, pontos) in enumerate(self.ranking):
+                y = caixa.top + 76 + i * 30
+                cor = OURO if i == 0 else TINTA
+                tela.blit(self.f_sub.render(f"{i + 1:>2}º  {nome}", True, cor), (caixa.left + 28, y))
+                valor = self.f_sub.render(f"{pontos} pts", True, cor)
+                tela.blit(valor, (caixa.right - 28 - valor.get_width(), y))
+            dica_ranking = self.f_dica.render("NPCs são referências; jogadores vêm dos saves deste computador.", True, TINTA)
+            tela.blit(dica_ranking, dica_ranking.get_rect(center=(caixa.centerx, caixa.bottom - 18)))
         if self.modo == "confirma":
             self._texto(self.f_sub, "Este slot já tem progresso. Sobrescrever?", BRANCO, (LARGURA // 2, 250))
         if self.modo in ("slots_carregar", "slots_novo"):
@@ -221,7 +265,8 @@ class CenaTitulo(Cena):
                 "slots_novo": "SETAS escolhem   ·   ENTER seleciona slot   ·   BACKSPACE volta",
                 "nome": "ENTER confirma o nome   ·   BACKSPACE apaga",
                 "confirma": "ENTER sobrescreve   ·   BACKSPACE volta",
-                "como": "ENTER ou clique para voltar"}[self.modo]
+                "como": "ENTER ou clique para voltar",
+                "ranking": "ENTER ou clique para voltar ao menu"}[self.modo]
         self._texto(self.f_dica, dica, BRANCO, (LARGURA // 2, ALTURA - 24))
         if self.saindo is not None:
             veu = pygame.Surface((LARGURA, ALTURA))
