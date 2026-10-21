@@ -6,8 +6,9 @@ from src.systems.pontuacao import PERGUNTAS_POR_FASE, TOTAL_FASES, PlacarFases, 
 
 
 class Progresso:
-    def __init__(self, caminho=None):
+    def __init__(self, caminho=None, nome_jogador="Ciclista"):
         self.caminho = caminho
+        self.nome_jogador = nome_jogador
         self.placar = PlacarFases()
         self.respostas = {f: {} for f in range(1, TOTAL_FASES + 1)}   # fase -> {npc_id: acertou}
         self.curiosidades = set()
@@ -45,7 +46,8 @@ class Progresso:
         dados = {"melhores": melhores, "concluidas": concluidas, "intro_vista": self.intro_vista,
                  "respostas": {str(f): r for f, r in self.respostas.items()},
                  "curiosidades": sorted(self.curiosidades), "tentativas": self.tentativas,
-                 "bosses": sorted(self.bosses), "conchas": self.conchas, "conchas_coletadas": sorted(self.conchas_coletadas)}
+                 "bosses": sorted(self.bosses), "conchas": self.conchas, "conchas_coletadas": sorted(self.conchas_coletadas),
+                 "nome_jogador": self.nome_jogador}
         try:
             Path(self.caminho).write_text(json.dumps(dados, ensure_ascii=False, indent=1), encoding="utf-8")
         except OSError:
@@ -63,7 +65,9 @@ class Progresso:
             tent = {str(k): int(v) for k, v in d.get("tentativas", {}).items()}
             conchas, cols = int(d.get("conchas", 0)), set(d.get("conchas_coletadas", []))
             bosses = set(d.get("bosses", []))
+            nome_jogador = str(d.get("nome_jogador", self.nome_jogador))[:18] or "Ciclista"
         except (ValueError, KeyError, TypeError, AttributeError):
             return   # save corrompido: começa do zero
         self.placar, self.respostas, self.curiosidades, self.intro_vista = placar, respostas, cur, intro
         self.tentativas, self.conchas, self.conchas_coletadas, self.bosses = tent, conchas, cols, bosses
+        self.nome_jogador = nome_jogador
